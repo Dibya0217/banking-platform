@@ -23,6 +23,7 @@
         <module>shared/banking-events</module>
         <module>services/auth-service</module>
         <module>services/customer-service</module>
+        <module>services/account-service</module>
     </modules>
 
     <properties>
