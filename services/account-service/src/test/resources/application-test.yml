@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=account
+    username: banking
+    password: banking123
+  flyway:
+    schemas: account
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      password: redis123
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+internal:
+  secret: internal-secret-change-me
+
+account:
+  max-per-customer: 3
+  balance-cache-ttl-seconds: 30
