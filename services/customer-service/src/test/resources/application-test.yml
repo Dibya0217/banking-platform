@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=customer
+    username: banking
+    password: banking123
+  flyway:
+    schemas: customer
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+internal:
+  secret: internal-secret-change-me
+  auth-service-url: http://localhost:8081
