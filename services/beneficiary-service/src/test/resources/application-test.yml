@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=beneficiary
+    username: banking
+    password: banking123
+  flyway:
+    schemas: beneficiary
+    locations: classpath:db/migration
+
+beneficiary:
+  max-per-customer: 20
+  cooldown-hours: 24

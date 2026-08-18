@@ -2,6 +2,7 @@ package com.banking.transaction.service;
 
 import com.banking.common.exception.BusinessRuleException;
 import com.banking.transaction.dto.request.DepositRequest;
+import com.banking.transaction.dto.request.TransactionHistoryFilter;
 import com.banking.transaction.dto.request.TransferRequest;
 import com.banking.transaction.dto.request.WithdrawRequest;
 import com.banking.transaction.dto.response.TransactionResponse;
@@ -11,6 +12,7 @@ import com.banking.transaction.entity.TransactionType;
 import com.banking.transaction.exception.TransactionNotFoundException;
 import com.banking.transaction.mapper.TransactionMapper;
 import com.banking.transaction.repository.TransactionRepository;
+import com.banking.transaction.repository.TransactionSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -162,17 +164,20 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional(readOnly = true)
-    public TransactionResponse getById(UUID transactionId, UUID requesterId) {
+    public TransactionResponse getById(UUID transactionId, UUID requesterId, boolean isAdmin) {
         Transaction txn = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+        if (!isAdmin && !requesterId.equals(txn.getInitiatedBy())) {
+            throw new BusinessRuleException("ACCESS_DENIED", "You do not have access to this transaction");
+        }
         return transactionMapper.toResponse(txn);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<TransactionResponse> getHistory(UUID accountId, Pageable pageable) {
+    public Page<TransactionResponse> getHistory(UUID accountId, TransactionHistoryFilter filter, Pageable pageable) {
         return transactionRepository
-                .findByFromAccountIdOrToAccountId(accountId, accountId, pageable)
+                .findAll(TransactionSpecification.forAccount(accountId, filter), pageable)
                 .map(transactionMapper::toResponse);
     }
 

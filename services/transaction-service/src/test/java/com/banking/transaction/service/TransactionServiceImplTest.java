@@ -210,7 +210,7 @@ class TransactionServiceImplTest {
         UUID txnId = UUID.randomUUID();
         given(transactionRepository.findById(txnId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> transactionService.getById(txnId, initiatedBy))
+        assertThatThrownBy(() -> transactionService.getById(txnId, initiatedBy, false))
                 .hasMessageContaining("Transaction not found");
     }
 }
