@@ -13,6 +13,8 @@ spring:
       password: redis123
   kafka:
     bootstrap-servers: ${spring.embedded.kafka.brokers}
+    consumer:
+      group-id: account-service-customer-cg
 
 internal:
   secret: internal-secret-change-me

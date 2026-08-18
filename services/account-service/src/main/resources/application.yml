@@ -30,6 +30,8 @@ spring:
           min-idle: 2
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: account-service-customer-cg
 
 server:
   port: 8083
