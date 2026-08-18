@@ -24,6 +24,7 @@
         <module>services/auth-service</module>
         <module>services/customer-service</module>
         <module>services/account-service</module>
+        <module>services/transaction-service</module>
     </modules>
 
     <properties>

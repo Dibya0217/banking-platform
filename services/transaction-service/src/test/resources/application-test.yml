@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=transaction
+    username: banking
+    password: banking123
+  flyway:
+    schemas: transaction
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      password: redis123
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+    consumer:
+      group-id: transaction-service-cg
+
+internal:
+  secret: internal-secret-change-me
+
+account-service:
+  base-url: http://localhost:9999
+
+transaction:
+  idempotency-ttl-seconds: 60
