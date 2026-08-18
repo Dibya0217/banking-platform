@@ -8,16 +8,23 @@ import com.banking.customer.dto.response.CustomerResponse;
 import com.banking.customer.entity.Customer;
 import com.banking.customer.entity.CustomerKyc;
 import com.banking.customer.entity.CustomerStatus;
+import com.banking.customer.entity.KycStatus;
 import com.banking.customer.exception.CustomerNotFoundException;
 import com.banking.customer.exception.DuplicateCustomerException;
 import com.banking.customer.mapper.CustomerMapper;
 import com.banking.customer.repository.CustomerKycRepository;
 import com.banking.customer.repository.CustomerRepository;
+import com.banking.events.customer.CustomerFrozenEvent;
+import com.banking.events.customer.CustomerKycApprovedEvent;
+import com.banking.events.customer.CustomerRegisteredEvent;
+import com.banking.common.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -29,13 +36,13 @@ public class CustomerServiceImpl implements CustomerService {
     private final CustomerKycRepository customerKycRepository;
     private final AuthServiceClient authServiceClient;
     private final CustomerMapper customerMapper;
+    private final CustomerEventPublisher eventPublisher;
 
     @Override
     @Transactional
     public CustomerRegistrationResponse register(CustomerRegistrationRequest request) {
         if (customerRepository.existsByEmailOrMobile(request.getEmail(), request.getMobile())) {
-            throw new DuplicateCustomerException(
-                    "A customer with this email or mobile already exists");
+            throw new DuplicateCustomerException("A customer with this email or mobile already exists");
         }
 
         Customer customer = Customer.builder()
@@ -55,6 +62,16 @@ public class CustomerServiceImpl implements CustomerService {
         customer = customerRepository.save(customer);
         log.info("Customer created: id={}, email={}", customer.getId(), customer.getEmail());
 
+        // Outbox event (same transaction as customer INSERT)
+        eventPublisher.publishCustomerRegistered(CustomerRegisteredEvent.of(
+                customer.getId().toString(),
+                customer.getFullName(),
+                customer.getEmail(),
+                customer.getMobile(),
+                MDC.get("correlationId")
+        ));
+
+        // Call Auth Service to create credentials (outside the Outbox — synchronous internal call)
         authServiceClient.createCredential(
                 customer.getId(),
                 customer.getEmail(),
@@ -96,11 +113,68 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional
-    public void freeze(UUID customerId, String reason) {
+    public void approveKyc(UUID customerId, UUID kycId, String adminId) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        CustomerKyc kyc = customerKycRepository.findById(kycId)
+                .orElseThrow(() -> new EntityNotFoundException("CustomerKyc", kycId));
+
+        kyc.setStatus(KycStatus.APPROVED);
+        kyc.setReviewedAt(Instant.now());
+        kyc.setReviewedBy(UUID.fromString(adminId));
+        customerKycRepository.save(kyc);
+
+        customer.setStatus(CustomerStatus.ACTIVE);
+        customerRepository.save(customer);
+
+        eventPublisher.publishCustomerKycApproved(CustomerKycApprovedEvent.of(
+                customerId.toString(),
+                kycId.toString(),
+                adminId,
+                MDC.get("correlationId")
+        ));
+
+        log.info("KYC approved for customerId={}, kycId={}, by adminId={}", customerId, kycId, adminId);
+    }
+
+    @Override
+    @Transactional
+    public void rejectKyc(UUID customerId, UUID kycId, String reason, String adminId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        CustomerKyc kyc = customerKycRepository.findById(kycId)
+                .orElseThrow(() -> new EntityNotFoundException("CustomerKyc", kycId));
+
+        kyc.setStatus(KycStatus.REJECTED);
+        kyc.setRejectionReason(reason);
+        kyc.setReviewedAt(Instant.now());
+        kyc.setReviewedBy(UUID.fromString(adminId));
+        customerKycRepository.save(kyc);
+
+        customer.setStatus(CustomerStatus.KYC_REJECTED);
+        customerRepository.save(customer);
+
+        log.info("KYC rejected for customerId={}, kycId={}, reason={}", customerId, kycId, reason);
+    }
+
+    @Override
+    @Transactional
+    public void freeze(UUID customerId, String reason, String frozenBy) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
         customer.setStatus(CustomerStatus.FROZEN);
         customerRepository.save(customer);
+
+        eventPublisher.publishCustomerFrozen(CustomerFrozenEvent.of(
+                customerId.toString(),
+                reason,
+                frozenBy,
+                MDC.get("correlationId")
+        ));
+
         log.info("Customer frozen: id={}, reason={}", customerId, reason);
     }
 

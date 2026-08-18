@@ -6,9 +6,11 @@ import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = {"com.banking.customer", "com.banking.common"})
 @ConfigurationPropertiesScan
+@EnableScheduling
 @OpenAPIDefinition(
         info = @Info(title = "Customer Service API", version = "v1",
                 description = "Customer registration, KYC, and profile management"),

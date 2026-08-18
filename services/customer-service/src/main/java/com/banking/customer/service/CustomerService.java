@@ -15,7 +15,11 @@ public interface CustomerService {
 
     void submitKyc(UUID customerId, KycSubmissionRequest request);
 
-    void freeze(UUID customerId, String reason);
+    void approveKyc(UUID customerId, UUID kycId, String adminId);
+
+    void rejectKyc(UUID customerId, UUID kycId, String reason, String adminId);
+
+    void freeze(UUID customerId, String reason, String frozenBy);
 
     void verifyMobile(UUID customerId);
 }
