@@ -54,6 +54,9 @@ jwt:
   access-token-expiry: 900       # 15 minutes in seconds
   refresh-token-expiry: 604800   # 7 days in seconds
 
+internal:
+  secret: ${INTERNAL_SECRET:internal-secret-change-me}
+
 logging:
   level:
     com.banking.auth: DEBUG
