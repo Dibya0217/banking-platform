@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=auth
+    username: banking
+    password: banking123
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      password: redis123
+  flyway:
+    schemas: auth
+    locations: classpath:db/migration
+
+jwt:
+  secret: banking-super-secret-jwt-key-change-in-production-256bits
+  access-token-expiry: 900
+  refresh-token-expiry: 604800
+
+internal:
+  secret: internal-secret-change-me
