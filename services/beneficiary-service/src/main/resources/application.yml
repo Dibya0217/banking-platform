@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: beneficiary-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=beneficiary
+    username: ${POSTGRES_USER:banking}
+    password: ${POSTGRES_PASSWORD:banking123}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+  flyway:
+    schemas: beneficiary
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+server:
+  port: 8085
+  servlet:
+    context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+beneficiary:
+  max-per-customer: 20
+  cooldown-hours: 24
+
+logging:
+  level:
+    com.banking.beneficiary: DEBUG
+    org.springframework.security: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"

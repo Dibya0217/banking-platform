@@ -2,6 +2,7 @@ package com.banking.transaction.controller;
 
 import com.banking.common.dto.ApiResponse;
 import com.banking.transaction.dto.request.DepositRequest;
+import com.banking.transaction.dto.request.TransactionHistoryFilter;
 import com.banking.transaction.dto.request.TransferRequest;
 import com.banking.transaction.dto.request.WithdrawRequest;
 import com.banking.transaction.dto.response.TransactionResponse;
@@ -64,21 +65,24 @@ public class TransactionController {
 
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get transaction by ID")
+    @Operation(summary = "Get transaction by ID — CUSTOMER sees own, ADMIN sees all")
     public ResponseEntity<ApiResponse<TransactionResponse>> getById(
             @PathVariable UUID id,
             Authentication auth) {
         UUID requesterId = UUID.fromString(auth.getName());
-        return ResponseEntity.ok(ApiResponse.success(transactionService.getById(id, requesterId)));
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(ApiResponse.success(transactionService.getById(id, requesterId, isAdmin)));
     }
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get paginated transaction history for an account")
+    @Operation(summary = "Get paginated transaction history with optional filters")
     public ResponseEntity<ApiResponse<Page<TransactionResponse>>> getHistory(
             @RequestParam UUID accountId,
+            TransactionHistoryFilter filter,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success(transactionService.getHistory(accountId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(transactionService.getHistory(accountId, filter, pageable)));
     }
 
     @PostMapping("/{id}/reverse")

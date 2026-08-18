@@ -2,8 +2,10 @@ package com.banking.transaction.dto.response;
 
 import com.banking.transaction.entity.TransactionStatus;
 import com.banking.transaction.entity.TransactionType;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,6 +13,8 @@ import java.util.UUID;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class TransactionResponse {
 
     private UUID id;

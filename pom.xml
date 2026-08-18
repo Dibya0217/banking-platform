@@ -25,6 +25,7 @@
         <module>services/customer-service</module>
         <module>services/account-service</module>
         <module>services/transaction-service</module>
+        <module>services/beneficiary-service</module>
     </modules>
 
     <properties>
