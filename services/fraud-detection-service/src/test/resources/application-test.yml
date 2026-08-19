@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/banking?currentSchema=fraud
+    username: banking
+    password: banking123
+  flyway:
+    schemas: fraud
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      password: redis123
+
+fraud:
+  velocity:
+    max-transactions-per-hour: 10
+  large-transaction:
+    threshold: 500000
+  auto-freeze:
+    alert-count-threshold: 3
+    alert-window-hours: 24
+  blacklist:
+    refresh-interval-ms: 300000

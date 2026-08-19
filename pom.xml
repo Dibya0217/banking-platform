@@ -28,6 +28,7 @@
         <module>services/beneficiary-service</module>
         <module>services/upi-service</module>
         <module>services/notification-service</module>
+        <module>services/fraud-detection-service</module>
     </modules>
 
     <properties>
