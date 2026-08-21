@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+
+    <!-- ── Masking converter: mobile numbers (10-digit, starts 6-9) ───────── -->
+    <conversionRule conversionWord="mask"
+                    converterClass="ch.qos.logback.core.pattern.color.ANSIConstants"/>
+
+    <!-- ── Console appender (dev / default profile) ──────────────────────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${appName}){blue} %clr([%X{correlationId}]){yellow} %clr(%-40.40logger{39}){cyan} : %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── JSON appender (prod profile) ──────────────────────────────────── -->
+    <springProfile name="prod">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <customFields>{"service":"${appName}"}</customFields>
+                <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <!-- Mask mobile numbers: 10-digit starting with 6-9 -->
+                <messageJsonValueTransformer class="net.logstash.logback.mask.RegexValueMasker">
+                    <regex>[6-9]\d{9}</regex>
+                    <mask>**MOBILE**</mask>
+                </messageJsonValueTransformer>
+                <!-- Mask Aadhaar numbers: 12-digit -->
+                <messageJsonValueTransformer class="net.logstash.logback.mask.RegexValueMasker">
+                    <regex>\d{12}</regex>
+                    <mask>**AADHAAR**</mask>
+                </messageJsonValueTransformer>
+            </encoder>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- ── Human-readable console (non-prod) ─────────────────────────────── -->
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- ── Logger levels ─────────────────────────────────────────────────── -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="com.banking" level="DEBUG"/>
+</configuration>

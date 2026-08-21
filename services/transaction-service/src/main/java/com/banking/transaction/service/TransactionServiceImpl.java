@@ -13,7 +13,9 @@ import com.banking.transaction.exception.TransactionNotFoundException;
 import com.banking.transaction.mapper.TransactionMapper;
 import com.banking.transaction.repository.TransactionRepository;
 import com.banking.transaction.repository.TransactionSpecification;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +29,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TransactionServiceImpl implements TransactionService {
 
     private final TransactionRepository transactionRepository;
@@ -35,6 +36,36 @@ public class TransactionServiceImpl implements TransactionService {
     private final IdempotencyService idempotencyService;
     private final AccountServiceClient accountServiceClient;
     private final TransactionEventPublisher eventPublisher;
+    private final MeterRegistry meterRegistry;
+
+    public TransactionServiceImpl(TransactionRepository transactionRepository,
+                                  TransactionMapper transactionMapper,
+                                  IdempotencyService idempotencyService,
+                                  AccountServiceClient accountServiceClient,
+                                  TransactionEventPublisher eventPublisher,
+                                  MeterRegistry meterRegistry) {
+        this.transactionRepository = transactionRepository;
+        this.transactionMapper = transactionMapper;
+        this.idempotencyService = idempotencyService;
+        this.accountServiceClient = accountServiceClient;
+        this.eventPublisher = eventPublisher;
+        this.meterRegistry = meterRegistry;
+    }
+
+    private Counter transactionCounter(String type, String status) {
+        return Counter.builder("banking_transactions_total")
+                .tag("type", type)
+                .tag("status", status)
+                .description("Total number of banking transactions")
+                .register(meterRegistry);
+    }
+
+    private DistributionSummary transactionAmountSummary(String type) {
+        return DistributionSummary.builder("banking_transactions_amount")
+                .tag("type", type)
+                .description("Distribution of banking transaction amounts")
+                .register(meterRegistry);
+    }
 
     @Override
     @Transactional
@@ -64,11 +95,14 @@ public class TransactionServiceImpl implements TransactionService {
             accountServiceClient.credit(request.getToAccountId(), request.getAmount(), txn.getId().toString());
             txn.transitionTo(TransactionStatus.COMPLETED);
             txn = transactionRepository.save(txn);
+            transactionCounter("DEPOSIT", "COMPLETED").increment();
+            transactionAmountSummary("DEPOSIT").record(request.getAmount().doubleValue());
             log.info("Deposit completed: txnId={}, account={}, amount={}", txn.getId(), request.getToAccountId(), request.getAmount());
         } catch (WebClientResponseException e) {
             txn.setFailureReason("Account service error: " + e.getStatusCode());
             txn.transitionTo(TransactionStatus.FAILED);
             txn = transactionRepository.save(txn);
+            transactionCounter("DEPOSIT", "FAILED").increment();
             eventPublisher.publishFailed(txn, txn.getFailureReason());
             log.error("Deposit failed: txnId={}, reason={}", txn.getId(), txn.getFailureReason());
             throw new BusinessRuleException("DEPOSIT_FAILED", "Deposit failed: " + e.getMessage());
@@ -108,11 +142,14 @@ public class TransactionServiceImpl implements TransactionService {
             accountServiceClient.debit(request.getFromAccountId(), request.getAmount(), txn.getId().toString());
             txn.transitionTo(TransactionStatus.COMPLETED);
             txn = transactionRepository.save(txn);
+            transactionCounter("WITHDRAW", "COMPLETED").increment();
+            transactionAmountSummary("WITHDRAW").record(request.getAmount().doubleValue());
             log.info("Withdrawal completed: txnId={}, account={}, amount={}", txn.getId(), request.getFromAccountId(), request.getAmount());
         } catch (WebClientResponseException e) {
             txn.setFailureReason("Account service error: " + e.getStatusCode());
             txn.transitionTo(TransactionStatus.FAILED);
             txn = transactionRepository.save(txn);
+            transactionCounter("WITHDRAW", "FAILED").increment();
             eventPublisher.publishFailed(txn, txn.getFailureReason());
             log.error("Withdrawal failed: txnId={}, reason={}", txn.getId(), txn.getFailureReason());
             throw new BusinessRuleException("WITHDRAWAL_FAILED", "Withdrawal failed: " + e.getMessage());
@@ -153,6 +190,8 @@ public class TransactionServiceImpl implements TransactionService {
 
         txn = transactionRepository.save(txn);
         eventPublisher.publishInitiated(txn);
+        transactionCounter("TRANSFER", "COMPLETED").increment();
+        transactionAmountSummary("TRANSFER").record(request.getAmount().doubleValue());
 
         log.info("Transfer initiated (async saga): txnId={}, from={}, to={}, amount={}",
                 txn.getId(), request.getFromAccountId(), request.getToAccountId(), request.getAmount());

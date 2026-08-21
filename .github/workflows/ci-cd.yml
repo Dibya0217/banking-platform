@@ -1,0 +1,207 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  JAVA_VERSION: '21'
+  JAVA_DISTRIBUTION: temurin
+
+jobs:
+  # ─── Job 1: Build shared libraries first ──────────────────────────────────
+  build-shared:
+    name: Build Shared Libraries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      - name: Build banking-commons
+        run: ./mvnw install -pl shared/banking-commons -am -DskipTests
+
+      - name: Build banking-events
+        run: ./mvnw install -pl shared/banking-events -am -DskipTests
+
+      - name: Cache shared library artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/com/banking
+          key: shared-libs-${{ github.sha }}
+          restore-keys: |
+            shared-libs-
+
+  # ─── Job 2: Build and test each service (matrix) ──────────────────────────
+  build-and-test:
+    name: Build & Test — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-shared
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - customer-service
+          - account-service
+          - transaction-service
+          - beneficiary-service
+          - upi-service
+          - notification-service
+          - fraud-detection-service
+          - statement-service
+          - admin-service
+          - audit-service
+          - api-gateway
+          - config-service
+          - eureka-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      - name: Restore shared library cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/com/banking
+          key: shared-libs-${{ github.sha }}
+          restore-keys: |
+            shared-libs-
+
+      - name: Run tests — ${{ matrix.service }}
+        run: ./mvnw test -pl services/${{ matrix.service }} -am
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.service }}
+          path: services/${{ matrix.service }}/target/surefire-reports/
+          retention-days: 7
+
+  # ─── Job 3: OWASP Dependency Check ────────────────────────────────────────
+  owasp-dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    needs: build-shared
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      - name: Restore shared library cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/com/banking
+          key: shared-libs-${{ github.sha }}
+          restore-keys: |
+            shared-libs-
+
+      - name: Run OWASP Dependency Check
+        run: |
+          ./mvnw org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=7 \
+            -DsuppressionFile=suppression.xml \
+            --fail-at-end \
+            || true
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: target/dependency-check-report.html
+          retention-days: 14
+
+  # ─── Job 4: Docker build & push to GHCR (main branch only) ───────────────
+  docker-build:
+    name: Docker Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - customer-service
+          - account-service
+          - transaction-service
+          - beneficiary-service
+          - upi-service
+          - notification-service
+          - fraud-detection-service
+          - statement-service
+          - admin-service
+          - audit-service
+          - api-gateway
+          - config-service
+          - eureka-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/banking-${{ matrix.service }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image — ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}

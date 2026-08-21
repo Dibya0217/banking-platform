@@ -8,7 +8,8 @@ import com.banking.fraud.rule.FraudCheckContext;
 import com.banking.fraud.rule.FraudRuleChain;
 import com.banking.fraud.rule.FraudRuleResult;
 import com.banking.common.exception.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -24,7 +25,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class FraudDetectionServiceImpl implements FraudDetectionService {
 
     private final FraudRuleChain fraudRuleChain;
@@ -32,6 +32,29 @@ public class FraudDetectionServiceImpl implements FraudDetectionService {
     private final BlacklistedAccountRepository blacklistedAccountRepository;
     private final BlacklistCacheService blacklistCacheService;
     private final FraudEventPublisher eventPublisher;
+    private final MeterRegistry meterRegistry;
+
+    public FraudDetectionServiceImpl(FraudRuleChain fraudRuleChain,
+                                     FraudAlertRepository fraudAlertRepository,
+                                     BlacklistedAccountRepository blacklistedAccountRepository,
+                                     BlacklistCacheService blacklistCacheService,
+                                     FraudEventPublisher eventPublisher,
+                                     MeterRegistry meterRegistry) {
+        this.fraudRuleChain = fraudRuleChain;
+        this.fraudAlertRepository = fraudAlertRepository;
+        this.blacklistedAccountRepository = blacklistedAccountRepository;
+        this.blacklistCacheService = blacklistCacheService;
+        this.eventPublisher = eventPublisher;
+        this.meterRegistry = meterRegistry;
+    }
+
+    private Counter fraudAlertCounter(String severity, String result) {
+        return Counter.builder("banking_fraud_alerts_total")
+                .tag("severity", severity)
+                .tag("result", result)
+                .description("Total number of fraud alerts raised")
+                .register(meterRegistry);
+    }
 
     @Value("${fraud.auto-freeze.alert-count-threshold:3}")
     private int alertCountThreshold;
@@ -50,6 +73,7 @@ public class FraudDetectionServiceImpl implements FraudDetectionService {
         List<FraudRuleResult> failures = results.stream().filter(r -> !r.passed()).toList();
 
         if (failures.isEmpty()) {
+            fraudAlertCounter("PASSED", "PASSED").increment();
             eventPublisher.publishFraudCheckPassed(context);
             log.debug("Fraud check passed for transactionId={}", transactionId);
             return;
@@ -72,6 +96,13 @@ public class FraudDetectionServiceImpl implements FraudDetectionService {
         // Block on CRITICAL severity (blacklist hit)
         boolean shouldBlock = failures.stream()
                 .anyMatch(r -> r.severity() == FraudAlertSeverity.CRITICAL);
+
+        // Record metrics per failed rule
+        for (FraudRuleResult failure : failures) {
+            String severityTag = failure.severity().name();
+            String resultTag = shouldBlock ? "BLOCKED" : "FLAGGED";
+            fraudAlertCounter(severityTag, resultTag).increment();
+        }
 
         eventPublisher.publishFraudAlertRaised(context, failures, shouldBlock);
 

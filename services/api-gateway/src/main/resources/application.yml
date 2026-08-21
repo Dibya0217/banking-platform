@@ -1,0 +1,42 @@
+spring:
+  application.name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:redis123}
+      timeout: 2000ms
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-change-me-in-production}
+
+gateway:
+  rate-limit:
+    requests-per-minute: 100
+  services:
+    auth: ${AUTH_SERVICE_URL:http://localhost:8081}
+    customer: ${CUSTOMER_SERVICE_URL:http://localhost:8082}
+    account: ${ACCOUNT_SERVICE_URL:http://localhost:8083}
+    transaction: ${TRANSACTION_SERVICE_URL:http://localhost:8084}
+    beneficiary: ${BENEFICIARY_SERVICE_URL:http://localhost:8085}
+    upi: ${UPI_SERVICE_URL:http://localhost:8086}
+    statement: ${STATEMENT_SERVICE_URL:http://localhost:8088}
+    admin: ${ADMIN_SERVICE_URL:http://localhost:8089}
+    fraud: ${FRAUD_SERVICE_URL:http://localhost:8090}
+    audit: ${AUDIT_SERVICE_URL:http://localhost:8091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.banking.gateway: DEBUG
