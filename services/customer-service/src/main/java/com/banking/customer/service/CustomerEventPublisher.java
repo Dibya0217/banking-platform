@@ -4,6 +4,7 @@ import com.banking.customer.entity.OutboxEvent;
 import com.banking.customer.repository.OutboxRepository;
 import com.banking.events.customer.CustomerFrozenEvent;
 import com.banking.events.customer.CustomerKycApprovedEvent;
+import com.banking.events.customer.CustomerKycRejectedEvent;
 import com.banking.events.customer.CustomerRegisteredEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +29,10 @@ public class CustomerEventPublisher {
     }
 
     public void publishCustomerKycApproved(CustomerKycApprovedEvent event) {
+        persist(event.getCustomerId(), event.getEventType(), event);
+    }
+
+    public void publishCustomerKycRejected(CustomerKycRejectedEvent event) {
         persist(event.getCustomerId(), event.getEventType(), event);
     }
 

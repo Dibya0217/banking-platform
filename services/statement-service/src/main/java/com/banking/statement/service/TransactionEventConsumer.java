@@ -102,14 +102,17 @@ public class TransactionEventConsumer {
         if (toAccountIdStr != null && !toAccountIdStr.isBlank() && !toAccountIdStr.equals("null")) {
             try {
                 UUID toAccountId = UUID.fromString(toAccountIdStr);
-                // For transfers, fromAccountId's record already used the transactionId
-                // For credit-only (deposit), use the same transactionId
+                // For transfers, fromAccountId's record already used the transactionId.
+                // Derive a deterministic credit-side UUID so Kafka redelivery is idempotent.
                 boolean needNewId = fromAccountIdStr != null && !fromAccountIdStr.isBlank()
                         && !fromAccountIdStr.equals("null");
+                UUID creditTransactionId = needNewId
+                        ? UUID.nameUUIDFromBytes((transactionId.toString() + "-credit").getBytes())
+                        : transactionId;
 
                 StatementTransaction creditTxn = StatementTransaction.builder()
                         .accountId(toAccountId)
-                        .transactionId(needNewId ? UUID.randomUUID() : transactionId)
+                        .transactionId(creditTransactionId)
                         .transactionType(transactionType)
                         .amount(amount)
                         .direction("CREDIT")

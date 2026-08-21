@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -32,6 +33,7 @@ public class JwtAuthenticationFilter implements WebFilter {
     );
 
     private final JwtProperties jwtProperties;
+    private final ReactiveRedisTemplate<String, String> redisTemplate;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -65,19 +67,43 @@ public class JwtAuthenticationFilter implements WebFilter {
                 roles = "ROLE_CUSTOMER";
             }
 
+            String jti = claims.get("jti", String.class);
             final String finalRoles = roles;
-            ServerWebExchange mutated = exchange.mutate()
-                    .request(r -> r
-                            .header("X-User-Id", userId)
-                            .header("X-User-Roles", finalRoles))
-                    .build();
 
-            return chain.filter(mutated);
+            // Check Redis blacklist for revoked tokens
+            if (jti != null) {
+                return redisTemplate.hasKey("auth:blacklist:" + jti)
+                        .flatMap(blacklisted -> {
+                            if (Boolean.TRUE.equals(blacklisted)) {
+                                log.warn("Blacklisted JWT jti={} rejected for userId={}", jti, userId);
+                                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                                return exchange.getResponse().setComplete();
+                            }
+                            return proceedWithAuth(exchange, chain, userId, finalRoles);
+                        })
+                        .onErrorResume(e -> {
+                            // On Redis failure, allow request through (fail-open) but log warning
+                            log.warn("Redis blacklist check failed, allowing request: {}", e.getMessage());
+                            return proceedWithAuth(exchange, chain, userId, finalRoles);
+                        });
+            }
+
+            return proceedWithAuth(exchange, chain, userId, finalRoles);
 
         } catch (Exception e) {
             log.warn("Invalid JWT: {}", e.getMessage());
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
+    }
+
+    private Mono<Void> proceedWithAuth(ServerWebExchange exchange, WebFilterChain chain,
+                                        String userId, String roles) {
+        ServerWebExchange mutated = exchange.mutate()
+                .request(r -> r
+                        .header("X-User-Id", userId)
+                        .header("X-User-Roles", roles))
+                .build();
+        return chain.filter(mutated);
     }
 }

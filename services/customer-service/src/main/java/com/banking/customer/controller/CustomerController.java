@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +34,18 @@ public class CustomerController {
             @Valid @RequestBody CustomerRegistrationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(customerService.register(request)));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List all customers (paginated, Admin only)")
+    public ResponseEntity<ApiResponse<Page<CustomerResponse>>> getAllCustomers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestHeader("X-User-Role") String role) {
+        Page<CustomerResponse> customers = customerService.findAll(page, size, search);
+        return ResponseEntity.ok(ApiResponse.success(customers));
     }
 
     @GetMapping("/{id}")

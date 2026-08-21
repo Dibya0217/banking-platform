@@ -189,8 +189,12 @@ public class TransactionServiceImpl implements TransactionService {
                 .build();
 
         txn = transactionRepository.save(txn);
+
+        txn.setStatus(TransactionStatus.FRAUD_CHECKING);
+        txn = transactionRepository.save(txn);
+
         eventPublisher.publishInitiated(txn);
-        transactionCounter("TRANSFER", "COMPLETED").increment();
+        transactionCounter("TRANSFER", "INITIATED").increment();
         transactionAmountSummary("TRANSFER").record(request.getAmount().doubleValue());
 
         log.info("Transfer initiated (async saga): txnId={}, from={}, to={}, amount={}",

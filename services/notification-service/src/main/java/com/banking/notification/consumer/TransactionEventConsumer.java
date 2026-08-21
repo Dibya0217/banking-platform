@@ -48,6 +48,11 @@ public class TransactionEventConsumer {
 
         if (initiatedBy == null) return;
 
+        // Extract email from event payload; transaction events carry initiatedBy (customerId) but no email.
+        // TODO: resolve email from customer-service once an HTTP client is added.
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
         String subject = type + " Successful";
         String body = "Your " + type.toLowerCase() + " of ₹" + amount
                 + " has been completed successfully. Reference: " + txnId;
@@ -55,7 +60,7 @@ public class TransactionEventConsumer {
         notificationService.send(
                 UUID.fromString(initiatedBy),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 subject, body, "transaction.completed"
         );
     }
@@ -68,6 +73,11 @@ public class TransactionEventConsumer {
 
         if (initiatedBy == null) return;
 
+        // Extract email from event payload; transaction events carry initiatedBy (customerId) but no email.
+        // TODO: resolve email from customer-service once an HTTP client is added.
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
         String subject = "Transaction Failed";
         String body = "Your transaction of ₹" + amount + " failed. Reason: " + reason
                 + ". Reference: " + txnId;
@@ -75,7 +85,7 @@ public class TransactionEventConsumer {
         notificationService.send(
                 UUID.fromString(initiatedBy),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 subject, body, "transaction.failed"
         );
     }
