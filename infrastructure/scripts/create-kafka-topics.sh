@@ -30,25 +30,8 @@ create_topic "banking.account.events" 12
 # Transaction events — highest throughput (core business)
 create_topic "banking.transaction.events" 24
 
-# UPI events
-create_topic "banking.upi.events" 12
-
 # Fraud events
 create_topic "banking.fraud.events" 6
-
-# Notification events
-create_topic "banking.notification.events" 6
-
-# Admin events
-create_topic "banking.admin.events" 3
-
-# Dead Letter Queues (DLQ) — 1 partition each, 30-day retention
-create_topic "banking.customer.events.dlq" 1
-create_topic "banking.account.events.dlq" 1
-create_topic "banking.transaction.events.dlq" 1
-create_topic "banking.upi.events.dlq" 1
-create_topic "banking.fraud.events.dlq" 1
-create_topic "banking.notification.events.dlq" 1
 
 echo ""
 echo "All topics created. Listing:"

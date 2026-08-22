@@ -29,6 +29,12 @@
         <module>services/upi-service</module>
         <module>services/notification-service</module>
         <module>services/fraud-detection-service</module>
+        <module>services/statement-service</module>
+        <module>services/admin-service</module>
+        <module>services/audit-service</module>
+        <module>services/api-gateway</module>
+        <module>services/eureka-service</module>
+        <module>services/config-service</module>
     </modules>
 
     <properties>
@@ -97,6 +103,12 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- Micrometer Prometheus registry -->
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
             </dependency>
         </dependencies>
     </dependencyManagement>

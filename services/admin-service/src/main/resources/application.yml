@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: admin-service
+  security: {}
+
+server:
+  port: 8089
+
+services:
+  customer: ${CUSTOMER_SERVICE_URL:http://localhost:8082}
+  account: ${ACCOUNT_SERVICE_URL:http://localhost:8083}
+  transaction: ${TRANSACTION_SERVICE_URL:http://localhost:8084}
+  fraud: ${FRAUD_SERVICE_URL:http://localhost:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.banking.admin: DEBUG

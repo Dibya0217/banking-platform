@@ -190,6 +190,14 @@ public class AccountServiceImpl implements AccountService {
         account.setFreezeReason(reason);
         accountRepository.save(account);
         balanceCacheService.invalidateBalance(accountId);
+
+        eventPublisher.publishAccountFrozen(
+                accountId.toString(),
+                account.getCustomerId().toString(),
+                reason,
+                "FRAUD_AUTO"
+        );
+
         log.info("Account frozen: id={}, reason={}", accountId, reason);
     }
 

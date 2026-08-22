@@ -16,11 +16,16 @@ import com.banking.customer.repository.CustomerKycRepository;
 import com.banking.customer.repository.CustomerRepository;
 import com.banking.events.customer.CustomerFrozenEvent;
 import com.banking.events.customer.CustomerKycApprovedEvent;
+import com.banking.events.customer.CustomerKycRejectedEvent;
 import com.banking.events.customer.CustomerRegisteredEvent;
 import com.banking.common.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,6 +100,20 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<CustomerResponse> findAll(int page, int size, String search) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Customer> customers;
+        if (search != null && !search.isBlank()) {
+            customers = customerRepository.findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                    search, search, pageable);
+        } else {
+            customers = customerRepository.findAll(pageable);
+        }
+        return customers.map(customerMapper::toResponse);
+    }
+
+    @Override
     @Transactional
     public void submitKyc(UUID customerId, KycSubmissionRequest request) {
         Customer customer = customerRepository.findById(customerId)
@@ -155,6 +174,14 @@ public class CustomerServiceImpl implements CustomerService {
 
         customer.setStatus(CustomerStatus.KYC_REJECTED);
         customerRepository.save(customer);
+
+        eventPublisher.publishCustomerKycRejected(CustomerKycRejectedEvent.of(
+                customerId.toString(),
+                kycId.toString(),
+                reason,
+                adminId,
+                MDC.get("correlationId")
+        ));
 
         log.info("KYC rejected for customerId={}, kycId={}, reason={}", customerId, kycId, reason);
     }

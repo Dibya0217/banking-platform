@@ -47,10 +47,17 @@ public class AccountEventConsumer {
         String accountNumber = node.path("accountNumber").asText("your account");
         if (customerId == null) return;
 
+        // Extract contact details from event payload.
+        // TODO: resolve email/mobile from customer-service once an HTTP client is added.
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+        String mobile = node.path("mobile").asText(null);
+        if (mobile == null || mobile.isBlank()) mobile = node.path("customerMobile").asText("0000000000");
+
         notificationService.send(
                 UUID.fromString(customerId),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 "Account Frozen — Action Required",
                 "Your account ending " + accountNumber + " has been frozen. "
                         + "Please contact our support team immediately.",
@@ -60,7 +67,7 @@ public class AccountEventConsumer {
         notificationService.send(
                 UUID.fromString(customerId),
                 NotificationChannel.SMS,
-                "+91XXXXXXXXXX",
+                mobile,
                 null,
                 "ALERT: Your bank account has been frozen. Contact support immediately.",
                 "account.frozen"
@@ -72,10 +79,15 @@ public class AccountEventConsumer {
         String accountNumber = node.path("accountNumber").asText("?");
         if (customerId == null) return;
 
+        // Extract email from event payload.
+        // TODO: resolve email from customer-service once an HTTP client is added.
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
         notificationService.send(
                 UUID.fromString(customerId),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 "Account Created Successfully",
                 "Your new bank account " + accountNumber + " has been created. "
                         + "You can now start transacting.",

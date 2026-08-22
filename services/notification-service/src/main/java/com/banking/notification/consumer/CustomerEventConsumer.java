@@ -32,6 +32,7 @@ public class CustomerEventConsumer {
                 case "customer.registered"    -> handleRegistered(node);
                 case "customer.kyc.approved"  -> handleKycApproved(node);
                 case "customer.kyc.rejected"  -> handleKycRejected(node);
+                case "customer.frozen"        -> handleCustomerFrozen(node);
                 default -> log.debug("Ignoring customer event: {}", eventType);
             }
 
@@ -62,10 +63,13 @@ public class CustomerEventConsumer {
         String customerId = node.path("customerId").asText(null);
         if (customerId == null) return;
 
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
         notificationService.send(
                 UUID.fromString(customerId),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 "KYC Approved — Account Activated",
                 "Your KYC has been verified and approved. Your account is now fully active. "
                         + "A savings account has been automatically created for you.",
@@ -78,14 +82,34 @@ public class CustomerEventConsumer {
         String reason = node.path("reason").asText("Please resubmit with valid documents.");
         if (customerId == null) return;
 
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
         notificationService.send(
                 UUID.fromString(customerId),
                 NotificationChannel.EMAIL,
-                "customer@placeholder.com",
+                email,
                 "KYC Verification Failed",
                 "Unfortunately, your KYC could not be verified. Reason: " + reason
                         + "\nPlease contact support for assistance.",
                 "customer.kyc.rejected"
+        );
+    }
+
+    private void handleCustomerFrozen(JsonNode node) {
+        String customerId = node.path("customerId").asText(null);
+        if (customerId == null) return;
+
+        String email = node.path("email").asText(null);
+        if (email == null || email.isBlank()) email = node.path("customerEmail").asText("noreply@banking.internal");
+
+        notificationService.send(
+                UUID.fromString(customerId),
+                NotificationChannel.EMAIL,
+                email,
+                "Account Frozen",
+                "Your account has been frozen. Please contact support.",
+                "customer.frozen"
         );
     }
 }

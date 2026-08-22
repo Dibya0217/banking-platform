@@ -5,6 +5,7 @@ import com.banking.account.repository.OutboxRepository;
 import com.banking.events.account.AccountCreatedEvent;
 import com.banking.events.account.AccountCreditedEvent;
 import com.banking.events.account.AccountDebitedEvent;
+import com.banking.events.account.AccountFrozenEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,12 @@ public class AccountEventPublisher {
     }
 
     public void publishAccountCredited(AccountCreditedEvent event) {
+        persist(event.getAccountId(), event.getEventType(), event);
+    }
+
+    public void publishAccountFrozen(String accountId, String customerId,
+                                      String reason, String freezeType) {
+        AccountFrozenEvent event = AccountFrozenEvent.of(accountId, customerId, reason, freezeType, null);
         persist(event.getAccountId(), event.getEventType(), event);
     }
 
